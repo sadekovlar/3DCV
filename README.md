@@ -1,4 +1,4 @@
-# Materials for the course "Computer Vision in Autonomous Driving Tasks"
+# Materials for the course "3D Computer Vision in Autonomous Driving Tasks"
 
 ## Content [in development]
 
@@ -13,20 +13,10 @@
 - Module 1a Camera, project and reproject points, bev transform
         - Translations
         - Rotations
-- Module 1b Camera calibration
-        - Calibration
+- Module 1b Camera calibration        - Calibration
         - Fish eye calibration
         - Desk pose visualization
-        - Camera pose estimation
-- Module 1c Image compression
-- Module 2 Image preprocessing
-        - Filters
-        - Histogram
-        - ColorSpaces
-- Module 2a Morphology
-- Module 3 Edge detector
-        - Haris corner detector
-        - Shi Tomasi corner detector
+        - Camera pose estim- Module 1c Image compression        - Shi Tomasi corner detector
 - Module 4a Feature point detector
         - SIFT
         - ORB
