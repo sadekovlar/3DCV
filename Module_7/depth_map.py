@@ -1,151 +1,13 @@
 import numpy as np
 import cv2
 from pathlib import Path
-import time
+import open3d as o3d
 
-def _load_images(filepath):
-        images = list()
-        cap = cv2.VideoCapture(filepath)
-        i=0 #переменная отслеживает каждый третий кадр
-        while cap.isOpened():
-            succeed, frame = cap.read()
-            if succeed:
-                images.append(frame)
-            else:
-                cap.release()
-        return np.array(images)
 
-def check_rectification_quality(rectifiedL, rectifiedR, num_points=100):
-    """
-    Проверка качества ректификации путем поиска соответствующих точек
+from src.poor_texture import configure_stereo_for_poor_texture
+from src.point_cloud import AsyncPointCloudVisualizer
+from src.load_calibration_params import load_calibration_params, load_images, load_relative_param
 
-    Параметры:
-    rectifiedL, rectifiedR: ректифицированные изображения
-    num_points: количество точек для проверки
-    """
-    # Преобразуем в оттенки серого если нужно
-    if len(rectifiedL.shape) == 3:
-        grayL = cv2.cvtColor(rectifiedL, cv2.COLOR_BGR2GRAY)
-        grayR = cv2.cvtColor(rectifiedR, cv2.COLOR_BGR2GRAY)
-    else:
-        grayL = rectifiedL
-        grayR = rectifiedR
-
-    # ОПТИМИЗИРОВАННЫЕ ПАРАМЕТРЫ для goodFeaturesToTrack
-    max_corners = 500  # Максимальное количество углов
-    quality_level = 0.0001  # Очень низкий порог качества (было 0.01)
-    min_distance = 5  # Минимальное расстояние между углами (было 10)
-    block_size = 3  # Размер блока для вычисления производных
-    use_harris = True  # Использовать детектор Harris
-    k = 0.04  # Параметр Harris
-
-    # Находим хорошие точки для отслеживания на левом изображении
-    featuresL = cv2.goodFeaturesToTrack(grayL,
-        max_corners,
-        quality_level,
-        min_distance,
-        blockSize=block_size,
-        useHarrisDetector=use_harris,
-        k=k)
-
-    if featuresL is None:
-        print("Не удалось найти достаточно точек для проверки")
-        return
-
-    # Находим соответствующие точки на правом изображении с помощью оптического потока
-    featuresR, status, _ = cv2.calcOpticalFlowPyrLK(grayL, grayR, featuresL, None)
-
-    # Создаем визуализацию
-    visl = cv2.cvtColor(grayL, cv2.COLOR_GRAY2BGR)
-    visr = cv2.cvtColor(grayR, cv2.COLOR_GRAY2BGR)
-    vis = np.hstack((visl, visr))
-
-    good_points = 0
-    total_y_diff = 0
-
-    for i, (ptL, ptR) in enumerate(zip(featuresL, featuresR)):
-        if status[i] == 1:
-            xL, yL = ptL.ravel()
-            xR, yR = ptR.ravel()
-
-            # Рисуем точки
-            cv2.circle(vis, (int(xL), int(yL)), 5, (0, 255, 0), -1)
-            cv2.circle(vis, (int(xR) + grayL.shape[1], int(yR)), 5, (0, 255, 0), -1)
-
-            # Рисуем линию, соединяющую соответствующие точки
-            cv2.line(vis, (int(xL), int(yL)),
-                    (int(xR) + grayL.shape[1], int(yR)), (0, 255, 0), 1)
-
-            # Проверяем разницу по y (должна быть близка к 0 при хорошей ректификации)
-            y_diff = abs(yL - yR)
-            total_y_diff += y_diff
-            good_points += 1
-
-    h, w = vis.shape[:2]
-    vis_new = cv2.resize(vis, (w//2, h//2))
-
-    if good_points > 0:
-        avg_y_diff = total_y_diff / good_points
-        print(f"Проверка качества ректификации:")
-        print(f"  Найдено соответствующих точек: {good_points}")
-        print(f"  Средняя разница по y: {avg_y_diff:.2f} пикселей")
-
-        if avg_y_diff < 1.0:
-            print("  ✓ Отличное качество ректификации!")
-        elif avg_y_diff < 3.0:
-            print("  ✓ Хорошее качество ректификации")
-        else:
-            print("  ⚠ Среднее качество ректификации")
-
-    # Отображаем результат
-    cv2.imshow("Rectification Quality Check", vis_new)
-    cv2.waitKey(1)
-
-    return avg_y_diff
-
-def load_calibration_params(calib_file):
-    """
-    Загрузка параметров калибровки стереопары из YAML файла
-
-    Параметры:
-    calib_file: путь к YAML файлу с параметрами калибровки
-
-    Возвращает:
-    Словарь с параметрами калибровки для левой и правой камер
-    """
-    # Загружаем YAML файл с помощью OpenCV
-    fs = cv2.FileStorage(calib_file, cv2.FILE_STORAGE_READ)
-
-    if not fs.isOpened():
-        raise IOError(f"Не удалось открыть файл калибровки: {calib_file}")
-
-    # Извлекаем параметры
-    K = fs.getNode("K").mat()
-    D = fs.getNode("D").mat()
-    r = fs.getNode("r").mat()  # Вектор Родригеса (углы поворота)
-    t = fs.getNode("t").mat()  # Вектор переноса
-    sz_node = fs.getNode("sz")  # Размер изображения
-    image_size = [int(sz_node.at(0).real()), int(sz_node.at(1).real())]
-
-    # Преобразуем вектор Родригеса в матрицу поворота (3x3)
-    # Для стереопары у нас есть только одно значение r, предполагаем что это поворот правой камеры относительно левой
-    R, _ = cv2.Rodrigues(r)
-
-    # Важно: Для правильной работы stereoRectify, левая камера должна иметь 
-    # единичную матрицу поворота и нулевой вектор переноса,
-    # а правая камера - матрицу поворота R и вектор переноса T
-
-    calib_params = {
-        'camera_matrix': K,
-        'dist_coeffs': D,
-        'R': R,  # Матрица поворота правой камеры относительно левой
-        'T': t,  # Вектор переноса правой камеры относительно левой
-        'image_size': image_size,
-        'rotation_vector': r,  # Исходный вектор Родригеса
-        'translation_vector': t
-    }
-    fs.release()
-    return calib_params
 
 def preprocess_image(image):
     # Произведите необходимую предварительную обработку изображения
@@ -157,58 +19,6 @@ def preprocess_image(image):
     # Улучшение контраста изображения
     image = cv2.equalizeHist(image)
     return image
-
-def load_relative_param(calib_file:str) ->dict:
-    # Загружаем YAML файл с помощью OpenCV
-    fs = cv2.FileStorage(calib_file, cv2.FILE_STORAGE_READ)
-
-    if not fs.isOpened():
-        raise IOError(f"Не удалось открыть файл калибровки: {calib_file}")
-
-    # Извлекаем параметры
-    R = fs.getNode("R").mat()
-    T = fs.getNode("T").mat()
-    fs.release()
-    calib = dict()
-    calib["R_rel"] = R
-    calib["T_rel"] = T
-    return calib
-
-
-def compute_relative_pose(R_abs_left, T_abs_left, R_abs_right, T_abs_right) ->dict:
-    """
-    Вычисление относительного положения правой камеры относительно левой
-    из абсолютных параметров положения камер
-
-    Параметры:
-    R_abs_left: матрица поворота левой камеры в абсолютной СК (3x3)
-    T_abs_left: вектор переноса левой камеры в абсолютной СК (3x1)
-    R_abs_right: матрица поворота правой камеры в абсолютной СК (3x3)
-    T_abs_right: вектор переноса правой камеры в абсолютной СК (3x1)
-
-    Возвращает:
-    R_rel: матрица поворота правой камеры относительно левой (3x3)
-    T_rel: вектор переноса правой камеры относительно левой (3x1)
-    """
-
-    # Преобразование точки из системы координат правой камеры в абсолютную СК:
-    # P_abs = R_abs_right * P_right + T_abs_right
-
-    # Преобразование точки из абсолютной СК в систему координат левой камеры:
-    # P_left = R_abs_left^T * (P_abs - T_abs_left)
-
-    # Подставляем первое уравнение во второе:
-    # P_left = R_abs_left^T * (R_abs_right * P_right + T_abs_right - T_abs_left)
-    # P_left = (R_abs_left^T * R_abs_right) * P_right + R_abs_left^T * (T_abs_right - T_abs_left)
-
-    # Таким образом:
-    R_rel = R_abs_left.T @ R_abs_right
-    T_rel = R_abs_left.T @ (T_abs_right - T_abs_left)
-
-    calib = dict()
-    calib["R_rel"] = R_rel
-    calib["T_rel"] = T_rel
-    return calib
 
 def visualize_epipolar_lines(imgL, imgR, num_lines=20):
     """
@@ -353,32 +163,60 @@ def visualize_stereo_pair(imgL, imgR, window_name="Stereo Pair", delay=50):
     key = cv2.waitKey(delay)
     return key
 
+def visualize_point_cloud_async(disparity, original_image, Q_matrix=None, max_distance=50.0, voxel_size=0.01):
+
+    points_3D = cv2.reprojectImageTo3D(disparity, Q_matrix)
+    depth_map = points_3D[:, :, 2]
+    # Создаем маску валидных точек
+    valid_mask = (depth_map > 0) & (depth_map < max_distance) & ~np.isnan(depth_map)
+
+    # Извлекаем точки и цвета
+    points = points_3D[valid_mask]
+
+    # Получаем цвета из оригинального изображения
+    colors = original_image[valid_mask].copy()
+    colors = colors / 255.0
+
+    # Создаем облако точек Open3D
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(points)
+    pcd.colors = o3d.utility.Vector3dVector(colors)
+
+    # Опционально: уменьшаем плотность для производительности
+    if voxel_size > 0 and len(points) > 100000:
+        print("Выполняется даунсэмплинг...")
+        pcd = pcd.voxel_down_sample(voxel_size)
+        print(f"После даунсэмплинга: {len(pcd.points)} точек")
+
+    return pcd
+
 
 def main(dir: str):
     # Загружаем видео с левой и правой камеры
     pathL = str(Path(dir,'kem.011.001.left.avi'))
     pathR = str(Path(dir,'kem.011.001.right.avi'))
-    imagesL = _load_images(pathL)
-    imagesR = _load_images(pathR)
+    imagesL = load_images(pathL)
+    imagesR = load_images(pathR)
     calib_l = load_calibration_params(str(Path(dir,'calib/cam_plg_left.yml')))
     calib_r = load_calibration_params(str(Path(dir,'calib/cam_plg_righ.yml')))
     calib = load_relative_param(str(Path(dir,'calib/extrinsics.yml')))
 
     print(f"Загружено {len(imagesL)} кадров")
 
-    # Параметры алгоритма стереозрения
-    num_disparities = 112
-    block_size = 5
-
     # Создание объекта для вычисления карты глубины
-    stereo = cv2.StereoBM_create(numDisparities=num_disparities, blockSize=block_size)
+    stereo = cv2.StereoBM_create()
+    stereo = configure_stereo_for_poor_texture(stereo, 'low')
+
+    point_cloud_visualizer = AsyncPointCloudVisualizer()
+    first_frame_processed = True
 
     # Обработка изображений и вычисление карты глубины
-    depth_maps = []
     for idx, (imgL, imgR) in enumerate(zip(imagesL, imagesR)):
         print(f"Обработка кадра {idx + 1}/{len(imagesL)}")
 
-        # Имитация ректификации (в реальном проекте использовать calib.rectify)
+        # визуализация стереопар
+        visualize_stereo_pair(imgL, imgR)
+
         rectifiedL, rectifiedR, Q, rois = rectify_stereo_images(imgL, imgR, calib_l, calib_r, calib)
         # check_rectification_quality(rectifiedL, rectifiedR)
 
@@ -391,23 +229,20 @@ def main(dir: str):
         gray_rectR = preprocess_image(rectifiedR)
 
         disparity = stereo.compute(gray_rectL, gray_rectR)
+        pcd = visualize_point_cloud_async(disparity, imgL, Q)
 
-        # ВИЗУАЛИЗАЦИЯ 5: Карта disparity
-        disparity_vis = cv2.normalize(disparity, None, 0, 255, cv2.NORM_MINMAX)
-        disparity_vis = np.uint8(disparity_vis)
-        disparity_color = cv2.applyColorMap(disparity_vis, cv2.COLORMAP_JET)
-        cv2.imshow("Disparity Map", disparity_color)
+        if first_frame_processed:
+            point_cloud_visualizer.show(pcd)
+            first_frame_processed = False
+        else:
+            point_cloud_visualizer.update(pcd)
 
-        # Вычисление карты глубины
-        depth_map = np.zeros_like(disparity, dtype=np.float32)
-        depth_map[disparity > 0] = (num_disparities * block_size) / disparity[disparity > 0]
-        # ВИЗУАЛИЗАЦИЯ 6: Карта глубины
-        depth_vis = cv2.normalize(depth_map, None, 0, 255, cv2.NORM_MINMAX)
+        # # ВИЗУАЛИЗАЦИЯ 6: Карта глубины
+        depth_vis = cv2.normalize(disparity, None, 0, 255, cv2.NORM_MINMAX)
         depth_vis = np.uint8(depth_vis)
         depth_color = cv2.applyColorMap(depth_vis, cv2.COLORMAP_VIRIDIS)
         cv2.imshow("Depth Map", depth_color)
 
-        depth_maps.append(depth_map)
         # Управление воспроизведением
         key = cv2.waitKey(200) & 0xFF
         if key == ord('q'):  # Выход
@@ -416,6 +251,7 @@ def main(dir: str):
             cv2.waitKey(0)
 
     cv2.destroyAllWindows()
+    point_cloud_visualizer.close()
 
     pass
 

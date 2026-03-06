@@ -24,7 +24,7 @@ def _load_images(filepath):
                 else: i+=1
                 images.append(frame)
             else:
-                cap.release()       
+                cap.release()
         return np.array(images)
 
 def calibrate_left(calib_df, results_dict):
@@ -104,8 +104,8 @@ def calibrate_right(calib_df, results_dict):
 
 def main(pathleft,pathright):
     # Путь к видеофайлам
-    pathL = str(Path('../data/stereo/kem.001',pathleft))
-    pathR = str(Path('../data/stereo/kem.001',pathright))
+    pathL = str(Path('./data/stereo/kem.001',pathleft))
+    pathR = str(Path('./data/stereo/kem.001',pathright))
 
     Left_img = _load_images(pathL)
     Right_img = _load_images(pathR)
@@ -170,14 +170,14 @@ def main(pathleft,pathright):
         left_gray = cv2.cvtColor(left_image, cv2.COLOR_BGR2GRAY)
         right_image = Right_img[row["right_image_name"]]
         right_gray = cv2.cvtColor(right_image, cv2.COLOR_BGR2GRAY)
-        
+
 		# Критерии уточнения обнаруженных углов
         checkerboard_flags = cv2.CALIB_CB_NORMALIZE_IMAGE + cv2.CALIB_CB_EXHAUSTIVE + cv2.CALIB_CB_ACCURACY
-        
+
         # Поиск
         left_retval, left_corners_array = cv2.findChessboardCornersSB(left_gray, (num_vertical_corners, num_horizontal_corners), checkerboard_flags)
         right_retval, right_corners_array = cv2.findChessboardCornersSB(right_gray, (num_vertical_corners, num_horizontal_corners), checkerboard_flags)
-		
+
 		# Если на одной из пар изображений не найдены углы
         if not (left_retval and right_retval):
             calib_df["found_chessboard"].loc[image_id] = False
@@ -327,7 +327,7 @@ def main(pathleft,pathright):
 
 	# Объединим левое и правое
     joined = np.concatenate([left_image, right_image], axis=1)
-    
+
     joined_small = cv2.resize(joined, (resized_width, resized_height), interpolation = cv2.INTER_AREA)
 
     joined_small = cv2.cvtColor(joined_small, cv2.COLOR_BGR2RGB)
