@@ -1,38 +1,6 @@
 # Materials for the course "3D Computer Vision in Autonomous Driving Tasks"
 
-## Content [in development]
-
-- Module 1 Basic image operation
-        - Reading, writing and displaying images
-        - Grayscaling
-        - Cropping
-        - Drawing images and shapes using OpenCV
-        - Scaling, re-sizing and interpolations
-        - Arithmetic Operations
-        - Bitwise Operations and Masking
-- Module 1a Camera, project and reproject points, bev transform
-        - Translations
-        - Rotations
-- Module 1b Camera calibration        - Calibration
-        - Fish eye calibration
-        - Desk pose visualization
-        - Camera pose estim- Module 1c Image compression        - Shi Tomasi corner detector
-- Module 4a Feature point detector
-        - SIFT
-        - ORB
-        - FAST
-        - descriptor extract
-        - HOG
-- Module 4b Feature tracking, image comparison, Network detectors
-        - RANSAC
-        - NN
-        - SuperPoint
-        - SuperGlue
-- Module 5 Hough Detector for camera calibration
-        - Line Extract
-        - Camera Pose estimation by line
-- Module 5c Area detector. Segmentattion mapping
-        - Graph base segmentation
+## Content
 - Module 6 Optical flow
         - Dense and sparse optical flow
         - Video stabilization
