@@ -22,13 +22,7 @@ link for data <https://cloud.mail.ru/public/abmx/Li8kWSVrU>
 python 3.9
 opencv 3.4.9
 
-## Installation
-
-With Makefile
-
-```bash
-make fullinstall
-```
+## Installation data
 
 Or manually
 
