@@ -23,7 +23,7 @@ class VisualOdometry():
 
         self.images = self._load_images(data_dir)
         self.gt_poses = self._load_poses(self, len_images=len(self.images))
-        self.orb = cv2.ORB_create(1000) 
+        self.orb = cv2.ORB_create(10000) 
         FLANN_INDEX_LSH = 6
         index_params = dict(algorithm=FLANN_INDEX_LSH, table_number=6, key_size=12, multi_probe_level=1)
         search_params = dict(checks=50)
@@ -255,7 +255,7 @@ def haversine(dists,angles):
     return Px,Py
 
 def main():
-    data_dir = '../../data/city'
+    data_dir = './data/city/'
     vo = VisualOdometry(data_dir)
 
     orb_x = []#массив позиций по x

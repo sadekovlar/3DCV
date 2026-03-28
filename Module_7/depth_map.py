@@ -126,7 +126,7 @@ def rectify_stereo_images(imgL, imgR, calib_L:dict, calib_R:dict, calib: dict):
 
     return rectifiedL, rectifiedR, Q, (roiL, roiR)
 
-def visualize_stereo_pair(imgL, imgR, window_name="Stereo Pair", delay=50):
+def visualize_stereo_pair(imgL, imgR, window_name="Stereo Pair", delay=200):
     """
     Функция для визуализации стереопары рядом
     """
@@ -256,4 +256,4 @@ def main(dir: str):
     pass
 
 if __name__ == '__main__':
-    main('/home/rinat/develop/3DCV/data/stereo/kem.011')
+    main('/Users/rinat/develop/3DCV/data/stereo/kem.011')

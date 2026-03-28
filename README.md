@@ -8,7 +8,7 @@
         - Slow Mo
 - Module 7 Stereovision. Disparity map, 3d point create
 - Module 7a Stereovision. Camera calibration
-- Module 8 Visual odometry
+- Module 8 Visual odometry and Visual-Inertial Odometry
 - Module 9 Structure for motion
 - Module 10 Video and inertial data fusion
 - Module 11 Lidar data processing
