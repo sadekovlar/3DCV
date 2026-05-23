@@ -24,4 +24,5 @@ pip install open3d
 2. Детализация работы подходов к нахождению точек плоскости и краевых точек
 python edge_plane_laz_demo.py ../testdata/lidar --save-figures
 3. Детализация работы метода NDT скрипт python ndt_laz_demo.py /Users/rinat/testdata/lidar
-
+4. Калибровка установки лидара по плоскости земли (высота, pitch, roll)
+   python lidar_ground_calib.py /path/to/xt1.022.010.robosenseCapture_1412666.laz
