@@ -26,3 +26,13 @@ python edge_plane_laz_demo.py ../testdata/lidar --save-figures
 3. Детализация работы метода NDT скрипт python ndt_laz_demo.py /Users/rinat/testdata/lidar
 4. Калибровка установки лидара по плоскости земли (высота, pitch, roll)
    python lidar_ground_calib.py /path/to/xt1.022.010.robosenseCapture_1412666.laz
+
+# Калибровка камеры и лидара
+Синхронный просмотр left/right AVI и LAZ по `grab_msec_timestamps.csv` (ROI доски: X −1…1, Y 5…6 м; старт ~625000 = эпизод 003):
+   python sync_grab_player.py /path/to/xt1.012345.021 --speed 2
+   python sync_grab_player.py /path/to/xt1.012345.021 --episode 003 --start-grab-msec 625000
+   Q/ESC — выход (работает и в окне LiDAR, и в окне Cameras)
+   Доска: 8×8 ячеек по 10 см (камера 7×7 углов), LiDAR ищет пятно 88×88 см в cyan-ROI.
+   LiDAR: оси, сетка земли (`lidar_ground_calib.json`, h≈2.32 м), контекст вокруг ROI затемнён.
+   Кубы 20×20×20 см при доске на всех сенсорах. ROI (cyan): X −1…1, Y 5…6 м, высота над землёй 0…2 м.
+   Положите `leftImage.yml` и `rightImage.yml` (K, D) в папку с данными.
